@@ -18,12 +18,20 @@ const setPathValue = (obj, path, value) => {
     const splitted = path.split('.');
     for (let i = 0; i < splitted.length; i++) {
         let k = splitted[i];
-
+        
         if (i == splitted.length -1)
-            obj[k] = value;
+        {
+            if (!obj[k])
+                obj[k] = value;
+            else {
+                throw `The following key was found more than once: ${path}`;
+            }
+        }
         else {
             if (!obj.hasOwnProperty(k))
                 obj[k] = {};
+            else if (obj[k] == 'string')
+                throw `The following key is conflicting with another one: ${path}`;
 
             obj = obj[k];
         }
@@ -64,7 +72,7 @@ const importProject = async (id) => {
     return translations;
 };
 
-const writeOut = async (project, translations, variant) => {
+const writeOut = async (project, translations, variant, ignoreTranspilationError) => {
     let fileContent = JSON.stringify(translations, null, 4);
 
     if (!project.destination)
@@ -78,7 +86,9 @@ const writeOut = async (project, translations, variant) => {
         
         if (errors.length) {
             console.log(`The TypeScript output file for project ${project.name || project.id} could not be generated properly!`);
-            return;
+
+            if (!ignoreTranspilationError)
+                return;
         }
     }
 
@@ -101,6 +111,8 @@ const run = async () => {
     const projectArgFull = process.argv.find(a => a.includes('project'));
     const projectArg = projectArgFull && projectArgFull.split('=')[1];
 
+    const ignoreTranspilationErrorArg = !!process.argv.find(a => a.includes('ignoreTranspilationError'));
+
     if (projectArg) {
         const project = config.projects.find(p => p.id == projectArg || p.name == projectArg);
 
@@ -117,10 +129,10 @@ const run = async () => {
 
         if (project.destination.includes(VARIANT_KEY)) {
             for (let variant in translations)
-                await writeOut(project, translations[variant], variant);
+                await writeOut(project, translations[variant], variant, ignoreTranspilationErrorArg);
         }
         else
-            await writeOut(project, translations);
+            await writeOut(project, translations, ignoreTranspilationErrorArg);
     }
 };
 
